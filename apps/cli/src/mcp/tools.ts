@@ -6,17 +6,23 @@
  * update, and complete tasks without any manual user intervention after
  * the initial `omni init`.
  *
+ * Token Efficiency:
+ *   The `get_context` tool is the primary entry point. It returns ALL
+ *   boot-up context in a single, compact call (~150-300 tokens), replacing
+ *   the need to read 4-7 separate resources on session start.
+ *
  * Tools:
- *   - set_task             Create or replace the active task (auto-archives old task)
- *   - update_blocker       Append a blocker (auto-creates task if needed)
- *   - set_task_status      Update task status (auto-archives on completion)
- *   - update_state         Generic task title/status update
- *   - update_rules         Append a rule to rules.md
- *   - add_log_entry        Write to the activity log
- *   - clear_blockers       Remove all blockers from the active task
- *   - get_task             Read the current active task
- *   - get_history          Read completed task history
- *   - write_summary        Write a handoff summary for the next agent
+ *   - get_context           ⚡ One-call boot: task + rules + log + architecture (~200 tokens)
+ *   - set_task              Create or replace the active task (auto-archives old task)
+ *   - update_blocker        Append a blocker (auto-creates task if needed)
+ *   - set_task_status       Update task status (auto-archives on completion)
+ *   - update_state          Generic task title/status update
+ *   - update_rules          Append a rule to rules.md
+ *   - add_log_entry         Write to the activity log
+ *   - clear_blockers        Remove all blockers from the active task
+ *   - get_task              Read the current active task
+ *   - get_history           Read completed task history
+ *   - write_summary         Write a handoff summary for the next agent
  */
 
 import { randomUUID } from 'node:crypto';
@@ -32,8 +38,11 @@ import {
   getCurrentBranch,
   appendHistory,
   readHistory,
+  readLogEntries,
   saveSummary,
   loadSummary,
+  detectArchitecture,
+  formatArchitectureCompact,
 } from '@omnicontext/core';
 
 // ---------------------------------------------------------------------------
@@ -86,6 +95,98 @@ function archiveCurrentTask(
   });
 }
 
+/**
+ * Build the ultra-compact boot context (~150-300 tokens).
+ * Replaces reading 4-7 separate resources.
+ */
+function buildCompactContext(omniDir: string, projectRoot: string): string {
+  const context = loadContext(omniDir);
+  const branch = getCurrentBranch(projectRoot);
+  const rules = loadRules(omniDir);
+  const recentLog = readLogEntries(omniDir, 5);
+  const history = readHistory(omniDir);
+  const summary = loadSummary(omniDir);
+  const arch = detectArchitecture(projectRoot);
+
+  const lines: string[] = [];
+
+  // Line 1: Project + branch
+  lines.push(`# ${arch.projectName ?? 'Project'} | branch: ${branch ?? 'detached'}`);
+
+  // Architecture (compact)
+  const archLine = formatArchitectureCompact(arch);
+  if (archLine) lines.push(archLine);
+
+  // Current task
+  lines.push('');
+  if (context.activeTask) {
+    const t = context.activeTask;
+    lines.push(`## Task: ${t.title} [${t.status}]`);
+    if (t.blockers.length > 0) {
+      lines.push(`Blockers (${t.blockers.length}):`);
+      for (const b of t.blockers.slice(-3)) { // last 3 only
+        lines.push(`- ${b.message} (${b.source})`);
+      }
+    }
+  } else {
+    lines.push('## No active task — use set_task to create one');
+  }
+
+  // Rules (compact — strip markdown header, keep only bullet points)
+  const rulesLines = rules
+    .split('\n')
+    .filter(l => l.startsWith('-') || l.startsWith('*'))
+    .slice(0, 10); // max 10 rules
+  if (rulesLines.length > 0) {
+    lines.push('');
+    lines.push('## Rules');
+    lines.push(...rulesLines);
+  }
+
+  // Last handoff summary (truncated)
+  if (summary && summary.length > 10) {
+    lines.push('');
+    lines.push('## Last Handoff');
+    // Take first 3 non-empty lines of the summary
+    const summaryLines = summary.split('\n').filter(l => l.trim()).slice(0, 3);
+    lines.push(...summaryLines);
+  }
+
+  // Recent activity (last 5, one-line each)
+  if (recentLog.length > 0) {
+    lines.push('');
+    lines.push('## Recent Activity');
+    for (const entry of recentLog) {
+      const ago = getTimeAgo(entry.timestamp);
+      lines.push(`- [${ago}] ${entry.message}`);
+    }
+  }
+
+  // History count
+  if (history.length > 0) {
+    lines.push('');
+    lines.push(`Completed tasks: ${history.length}`);
+  }
+
+  return lines.join('\n');
+}
+
+/** Format a timestamp as a human-readable relative time. */
+function getTimeAgo(isoTimestamp: string): string {
+  const now = Date.now();
+  const then = new Date(isoTimestamp).getTime();
+  const diffMs = now - then;
+
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 // ---------------------------------------------------------------------------
 // Tool definitions (JSON Schema for MCP)
 // ---------------------------------------------------------------------------
@@ -99,11 +200,23 @@ export interface ToolDefinition {
 export function listTools(): ToolDefinition[] {
   return [
     {
+      name: 'get_context',
+      description:
+        'GET THIS FIRST. Returns all project context in a single compact response (~200 tokens): ' +
+        'active task, blockers, rules, recent activity, project architecture, and last handoff summary. ' +
+        'This replaces reading multiple resources individually and saves significant tokens. ' +
+        'Call this once at session start instead of reading context://active-task, context://rules, ' +
+        'context://log, and context://summary separately.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
       name: 'set_task',
       description:
-        'Create or replace the active task. You MUST call this at the start of every new ' +
-        'coding session to define what you are working on. If a task already exists, it will ' +
-        'be archived to history and replaced. This is the primary way to track what you are doing.',
+        'Create or replace the active task. Call this when the user gives you a new goal. ' +
+        'If a task already exists, it is auto-archived to history and replaced.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -120,7 +233,7 @@ export function listTools(): ToolDefinition[] {
       description:
         'Log an error or blocker against the active task. Call this whenever you encounter ' +
         'an error, test failure, or unexpected behavior. If no task exists, one will be ' +
-        'auto-created. This builds a traceable history for the next agent.',
+        'auto-created.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -137,11 +250,10 @@ export function listTools(): ToolDefinition[] {
     {
       name: 'set_task_status',
       description:
-        'Update the active task lifecycle status. Call this when: ' +
-        '(1) you finish the task → "completed" (auto-archives to history), ' +
-        '(2) you are stuck → "blocked", ' +
-        '(3) you resume work → "active". ' +
-        'If no task exists, one will be auto-created.',
+        'Update the active task lifecycle status. ' +
+        '"completed" → auto-archives to history, ' +
+        '"blocked" → marks stuck, ' +
+        '"active" → resumes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -157,9 +269,8 @@ export function listTools(): ToolDefinition[] {
     {
       name: 'update_state',
       description:
-        'Modify the active task title and/or status in a single call. ' +
-        'Use this to refine the task description as your understanding evolves. ' +
-        'If no task exists, one will be auto-created.',
+        'Modify the active task title and/or status. ' +
+        'Use to refine the task description as your understanding evolves.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -175,8 +286,8 @@ export function listTools(): ToolDefinition[] {
     {
       name: 'update_rules',
       description:
-        'Append a new rule or instruction to the project rules.md. Use this to record ' +
-        'coding standards, architecture decisions, or constraints that future agents should follow.',
+        'Append a rule to rules.md. Record coding standards, architecture decisions, ' +
+        'or constraints that future agents must follow.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -188,9 +299,8 @@ export function listTools(): ToolDefinition[] {
     {
       name: 'add_log_entry',
       description:
-        'Write an entry to the project activity log. Call this to record important ' +
-        'decisions, architecture changes, progress milestones, or anything the next agent ' +
-        'should know about. This is your primary communication channel with future agents.',
+        'Write to the activity log. Record decisions, progress, or anything ' +
+        'the next agent should know. This is your communication channel.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -201,9 +311,7 @@ export function listTools(): ToolDefinition[] {
     },
     {
       name: 'clear_blockers',
-      description:
-        'Remove all blockers from the active task. Call this after you have resolved ' +
-        'all blocking issues so the next agent sees a clean state.',
+      description: 'Remove all blockers from the active task.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -211,10 +319,7 @@ export function listTools(): ToolDefinition[] {
     },
     {
       name: 'get_task',
-      description:
-        'Read the current active task, including title, status, and blockers. ' +
-        'Call this at the start of a session to understand the current objective ' +
-        'and any blockers left by the previous agent.',
+      description: 'Read the current active task with title, status, and blockers.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -222,15 +327,13 @@ export function listTools(): ToolDefinition[] {
     },
     {
       name: 'get_history',
-      description:
-        'Read the history of completed and replaced tasks. Use this to understand ' +
-        'what has been worked on before and avoid duplicating effort.',
+      description: 'Read completed task history. Use to avoid re-doing previous work.',
       inputSchema: {
         type: 'object',
         properties: {
           limit: {
             type: 'number',
-            description: 'Maximum number of history entries to return (default: 10)',
+            description: 'Max entries to return (default: 10)',
           },
         },
       },
@@ -238,15 +341,14 @@ export function listTools(): ToolDefinition[] {
     {
       name: 'write_summary',
       description:
-        'Write a handoff summary for the next agent. Call this when you finish a session ' +
-        'to leave a clear, structured summary of what you accomplished, what is still pending, ' +
-        'and any important context. This is the most important thing you can do for the next agent.',
+        'Write a handoff summary for the next agent. Call on session end ' +
+        'with what you did, what is pending, and key context.',
       inputSchema: {
         type: 'object',
         properties: {
           summary: {
             type: 'string',
-            description: 'Markdown-formatted summary of your session: what you did, what is pending, and key context',
+            description: 'Markdown summary: what you did, what is pending, key context',
           },
         },
         required: ['summary'],
@@ -277,6 +379,14 @@ export function executeTool(
 
   switch (toolName) {
     // ------------------------------------------------------------------
+    // COMPACT CONTEXT — single-call boot (~200 tokens)
+    // ------------------------------------------------------------------
+    case 'get_context': {
+      const compact = buildCompactContext(omniDir, projectRoot);
+      return text(compact);
+    }
+
+    // ------------------------------------------------------------------
     // CREATE / REPLACE task (auto-archives the old one)
     // ------------------------------------------------------------------
     case 'set_task': {
@@ -299,11 +409,11 @@ export function executeTool(
       appendLogEntry(omniDir, {
         timestamp: now,
         source: 'mcp',
-        message: `Task created: "${title}"`,
+        message: `Task set: "${title}"`,
         branch: branch ?? undefined,
       });
 
-      return text(`Task created: "${title}" (id: ${context.activeTask.id})`);
+      return text(`Task set: "${title}"`);
     }
 
     // ------------------------------------------------------------------
@@ -323,11 +433,11 @@ export function executeTool(
       appendLogEntry(omniDir, {
         timestamp: new Date().toISOString(),
         source: 'mcp',
-        message: `Blocker added by ${blocker.source}: "${blocker.message}"`,
+        message: `Blocker: ${blocker.message}`,
         branch: branch ?? undefined,
       });
 
-      return text(`Blocker added: "${blocker.message}" (total: ${context.activeTask!.blockers.length})`);
+      return text(`Blocker logged (total: ${context.activeTask!.blockers.length})`);
     }
 
     // ------------------------------------------------------------------
@@ -343,26 +453,18 @@ export function executeTool(
       appendLogEntry(omniDir, {
         timestamp: new Date().toISOString(),
         source: 'mcp',
-        message: `Task status changed to: ${status}`,
+        message: `Status → ${status}`,
         branch: branch ?? undefined,
       });
 
       // Auto-archive completed tasks
       if (status === 'completed') {
         archiveCurrentTask(omniDir, 'completed', projectRoot);
-        // Clear the active task after archiving
         context.activeTask = undefined;
         saveContext(omniDir, context);
-
-        appendLogEntry(omniDir, {
-          timestamp: new Date().toISOString(),
-          source: 'mcp',
-          message: 'Task archived to history (completed)',
-          branch: branch ?? undefined,
-        });
       }
 
-      return text(`Task status updated to: ${status}`);
+      return text(`Status → ${status}`);
     }
 
     // ------------------------------------------------------------------
@@ -382,14 +484,7 @@ export function executeTool(
       context.activeTask!.updatedAt = new Date().toISOString();
       saveContext(omniDir, context);
 
-      appendLogEntry(omniDir, {
-        timestamp: new Date().toISOString(),
-        source: 'mcp',
-        message: `State updated: ${changes.join(', ')}`,
-        branch: branch ?? undefined,
-      });
-
-      return text(`State updated: ${changes.join(', ')}`);
+      return text(`Updated: ${changes.join(', ')}`);
     }
 
     // ------------------------------------------------------------------
@@ -398,13 +493,6 @@ export function executeTool(
       const rule = String(args.rule);
       const updated = current.trimEnd() + `\n- ${rule}\n`;
       saveRules(omniDir, updated);
-
-      appendLogEntry(omniDir, {
-        timestamp: new Date().toISOString(),
-        source: 'mcp',
-        message: `Rule added: "${rule}"`,
-        branch: branch ?? undefined,
-      });
 
       return text(`Rule added: "${rule}"`);
     }
@@ -419,7 +507,7 @@ export function executeTool(
         branch: branch ?? undefined,
       });
 
-      return text(`Logged: "${message}"`);
+      return text(`Logged`);
     }
 
     // ------------------------------------------------------------------
@@ -432,13 +520,6 @@ export function executeTool(
       context.activeTask!.updatedAt = new Date().toISOString();
       saveContext(omniDir, context);
 
-      appendLogEntry(omniDir, {
-        timestamp: new Date().toISOString(),
-        source: 'mcp',
-        message: `Cleared ${count} blocker(s)`,
-        branch: branch ?? undefined,
-      });
-
       return text(`Cleared ${count} blocker(s)`);
     }
 
@@ -446,16 +527,30 @@ export function executeTool(
     case 'get_task': {
       const context = loadContext(omniDir);
       if (!context.activeTask) {
-        return text(JSON.stringify({ activeTask: null, hint: 'No active task. Use set_task to create one.' }, null, 2));
+        return text('No active task. Use set_task to create one.');
       }
-      return text(JSON.stringify({ activeTask: context.activeTask }, null, 2));
+      const t = context.activeTask;
+      // Compact format instead of full JSON
+      let out = `${t.title} [${t.status}]`;
+      if (t.blockers.length > 0) {
+        out += `\nBlockers: ${t.blockers.map(b => b.message).join('; ')}`;
+      }
+      return text(out);
     }
 
     // ------------------------------------------------------------------
     case 'get_history': {
       const limit = typeof args.limit === 'number' ? args.limit : 10;
       const entries = readHistory(omniDir, limit);
-      return text(JSON.stringify({ history: entries, count: entries.length }, null, 2));
+      if (entries.length === 0) {
+        return text('No task history yet.');
+      }
+      // Compact: one line per task
+      const lines = entries.map(e => {
+        const ago = getTimeAgo(e.archivedAt);
+        return `${e.reason === 'completed' ? '✅' : '🔄'} ${e.task.title} (${e.reason}, ${ago})`;
+      });
+      return text(lines.join('\n'));
     }
 
     // ------------------------------------------------------------------
@@ -470,7 +565,7 @@ export function executeTool(
         branch: branch ?? undefined,
       });
 
-      return text('Handoff summary written to summary.md');
+      return text('Summary saved');
     }
 
     // ------------------------------------------------------------------

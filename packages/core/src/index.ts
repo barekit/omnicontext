@@ -78,3 +78,10 @@ export {
   setupAllAgents,
   type SetupResult,
 } from './mcp-config.js';
+
+// ---- Architecture detection ----
+export {
+  detectArchitecture,
+  formatArchitectureCompact,
+  type ProjectArchitecture,
+} from './architecture.js';
