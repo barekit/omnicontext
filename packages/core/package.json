@@ -1,0 +1,33 @@
+{
+  "name": "@omnicontext/core",
+  "version": "0.1.0",
+  "description": "Shared schemas, utilities, and git watcher for OmniContext",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/barekit/omnicontext.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/barekit/omnicontext/issues"
+  },
+  "homepage": "https://github.com/barekit/omnicontext/tree/main/packages/core#readme",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "latest",
+    "chokidar": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest",
+    "vitest": "^4.1.5"
+  }
+}

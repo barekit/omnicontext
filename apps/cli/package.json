@@ -1,0 +1,37 @@
+{
+  "name": "@omnicontext/cli",
+  "version": "0.1.0",
+  "description": "CLI and MCP server for OmniContext — AI agent project memory layer",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/barekit/omnicontext.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/barekit/omnicontext/issues"
+  },
+  "homepage": "https://github.com/barekit/omnicontext/tree/main/apps/cli#readme",
+  "keywords": ["mcp", "ai", "context", "cursor", "claude", "aider", "coding-agent"],
+  "bin": {
+    "omni": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "tsc --noEmit",
+    "start": "node ./dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "@omnicontext/core": "workspace:*",
+    "commander": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest",
+    "vitest": "^4.1.5"
+  }
+}

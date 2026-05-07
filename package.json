@@ -1,0 +1,25 @@
+{
+  "name": "omnicontext",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/barekit/omnicontext.git"
+  },
+  "bugs": {
+    "url": "https://github.com/barekit/omnicontext/issues"
+  },
+  "homepage": "https://github.com/barekit/omnicontext#readme",
+  "packageManager": "pnpm@11.0.8",
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "latest",
+    "vitest": "^4.1.5"
+  }
+}
