@@ -18,13 +18,14 @@ import {
   ensureGitignore,
   getCurrentBranch,
   setupAllAgents,
+  getOrBuildIndex,
 } from '@omnicontext/core';
 
 export const initCommand = new Command('init')
   .description('Initialize OmniContext in the current directory')
   .option('--force', 'Re-initialize even if .omnicode already exists')
   .option('--setup-mcp [agent]', 'Auto-configure MCP in AI coding agents (cursor, claude-desktop, windsurf)')
-  .action((opts) => {
+  .action(async (opts) => {
     const cwd = process.cwd();
 
     try {
@@ -47,6 +48,10 @@ export const initCommand = new Command('init')
       console.log('   Created: .omnicode/rules.md');
       console.log('   Created: .omnicode/log.jsonl');
       console.log('   Created: .omnicode/history.jsonl');
+
+      process.stdout.write('\n🧠 Building codebase intelligence index... ');
+      await getOrBuildIndex(cwd);
+      console.log('Done.');
 
       // Auto-configure MCP if requested
       if (opts.setupMcp !== undefined) {

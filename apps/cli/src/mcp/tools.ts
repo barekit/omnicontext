@@ -25,6 +25,7 @@
  *   - write_summary         Write a handoff summary for the next agent
  */
 
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   type Blocker,
@@ -43,6 +44,15 @@ import {
   loadSummary,
   detectArchitecture,
   formatArchitectureCompact,
+  // Codebase Intelligence
+  searchIndex,
+  getOrBuildIndex,
+  getIndexSummary,
+  readFileSmart,
+  type ReadMode,
+  findRelevantFiles,
+  formatRelevantFilesCompact,
+  getChangedFiles,
 } from '@omnicontext/core';
 
 // ---------------------------------------------------------------------------
@@ -99,7 +109,7 @@ function archiveCurrentTask(
  * Build the ultra-compact boot context (~150-300 tokens).
  * Replaces reading 4-7 separate resources.
  */
-function buildCompactContext(omniDir: string, projectRoot: string): string {
+async function buildCompactContext(omniDir: string, projectRoot: string): Promise<string> {
   const context = loadContext(omniDir);
   const branch = getCurrentBranch(projectRoot);
   const rules = loadRules(omniDir);
@@ -117,6 +127,11 @@ function buildCompactContext(omniDir: string, projectRoot: string): string {
   const archLine = formatArchitectureCompact(arch);
   if (archLine) lines.push(archLine);
 
+  // Git changes
+  const gitChanges = getChangedFiles(projectRoot);
+  lines.push('');
+  lines.push(gitChanges);
+
   // Current task
   lines.push('');
   if (context.activeTask) {
@@ -131,6 +146,11 @@ function buildCompactContext(omniDir: string, projectRoot: string): string {
   } else {
     lines.push('## No active task — use set_task to create one');
   }
+
+  // Relevant files
+  const relevantFiles = await formatRelevantFilesCompact(projectRoot, context.activeTask || null);
+  lines.push('');
+  lines.push(relevantFiles);
 
   // Rules (compact — strip markdown header, keep only bullet points)
   const rulesLines = rules
@@ -354,6 +374,60 @@ export function listTools(): ToolDefinition[] {
         required: ['summary'],
       },
     },
+    {
+      name: 'search_codebase',
+      description: 'Search the codebase index by keyword. Returns matching files and their exported symbols. Much faster and more token-efficient than running grep or find commands.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search term or keyword (e.g. "auth", "validateSession")',
+          },
+          limit: {
+            type: 'number',
+            description: 'Max results (default: 10)',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'read_file_smart',
+      description: 'Read a file using token-efficient modes. Use "signatures" to quickly understand a file without reading its bodies. Use "relevant" to extract only sections matching your keywords.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: {
+            type: 'string',
+            description: 'Absolute path or relative path to the file',
+          },
+          mode: {
+            type: 'string',
+            enum: ['signatures', 'relevant', 'full'],
+            description: 'Read mode (default: signatures)',
+          },
+          keywords: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Keywords for "relevant" mode to filter matching sections',
+          },
+          tokenBudget: {
+            type: 'number',
+            description: 'Max tokens to return before truncating (default: 500)',
+          },
+        },
+        required: ['filePath'],
+      },
+    },
+    {
+      name: 'get_changed_files',
+      description: 'Get a compact summary of files changed since the last commit or agent session.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
   ];
 }
 
@@ -365,12 +439,12 @@ export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
 }
 
-export function executeTool(
+export async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
   omniDir: string,
   projectRoot: string,
-): ToolResult {
+): Promise<ToolResult> {
   const text = (msg: string): ToolResult => ({
     content: [{ type: 'text', text: msg }],
   });
@@ -382,7 +456,7 @@ export function executeTool(
     // COMPACT CONTEXT — single-call boot (~200 tokens)
     // ------------------------------------------------------------------
     case 'get_context': {
-      const compact = buildCompactContext(omniDir, projectRoot);
+      const compact = await buildCompactContext(omniDir, projectRoot);
       return text(compact);
     }
 
@@ -566,6 +640,54 @@ export function executeTool(
       });
 
       return text('Summary saved');
+    }
+
+    // ------------------------------------------------------------------
+    case 'search_codebase': {
+      const query = String(args.query);
+      const limit = typeof args.limit === 'number' ? args.limit : 10;
+      
+      const db = await getOrBuildIndex(projectRoot);
+      const results = await searchIndex(db, query, limit);
+      
+      if (results.length === 0) {
+        return text(`No matches found for "${query}"`);
+      }
+      
+      const lines = [`Codebase matches for "${query}":`];
+      for (const r of results) {
+        lines.push(`- ${r.path} (${r.language})`);
+        if (r.exports) {
+          lines.push(`  exports: ${r.exports}`);
+        }
+      }
+      
+      return text(lines.join('\n'));
+    }
+
+    // ------------------------------------------------------------------
+    case 'read_file_smart': {
+      const relOrAbs = String(args.filePath);
+      const filePath = path.isAbsolute(relOrAbs) ? relOrAbs : path.join(projectRoot, relOrAbs);
+      
+      const mode = (args.mode as ReadMode) || 'signatures';
+      const keywords = Array.isArray(args.keywords) ? args.keywords.map(String) : [];
+      const tokenBudget = typeof args.tokenBudget === 'number' ? args.tokenBudget : 500;
+      
+      const result = readFileSmart(filePath, mode, { tokenBudget, keywords });
+      
+      let out = `File: ${result.path}\nMode: ${result.mode}\nTokens: ~${result.estimatedTokens}`;
+      if (result.truncated) {
+        out += ' (TRUNCATED)';
+      }
+      out += `\n---\n${result.content}`;
+      
+      return text(out);
+    }
+
+    // ------------------------------------------------------------------
+    case 'get_changed_files': {
+      return text(getChangedFiles(projectRoot));
     }
 
     // ------------------------------------------------------------------

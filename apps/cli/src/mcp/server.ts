@@ -8,8 +8,10 @@
  * swaps the active context when the developer changes branches.
  */
 
+// @ts-ignore - Server is marked deprecated in favor of high-level McpServer, but we need low-level for dynamic routing
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+// @ts-ignore - Schemas are marked deprecated in favor of McpServer, but required for low-level Server
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
@@ -20,6 +22,7 @@ import {
   requireOmniDir,
   GitWatcher,
   ProfileManager,
+  getOrBuildIndex,
   type BranchChangeEvent,
 } from '@omnicontext/core';
 import { listResources, readResource } from './resources.js';
@@ -60,7 +63,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
-    const result = executeTool(request.params.name, args, omniDir, projectRoot);
+    const result = await executeTool(request.params.name, args, omniDir, projectRoot);
     return result as any;
   });
 
@@ -98,6 +101,12 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+
+  // ---- Background Indexing ----
+  // Kick off an async index build/load to warm the cache.
+  getOrBuildIndex(projectRoot).catch((err) => {
+    process.stderr.write(`[omnicontext] Background index error: ${err.message}\n`);
+  });
 
   // ---- Start ----
   const transport = new StdioServerTransport();

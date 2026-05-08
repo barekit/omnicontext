@@ -85,3 +85,9 @@ export {
   formatArchitectureCompact,
   type ProjectArchitecture,
 } from './architecture.js';
+
+// ---- Codebase Intelligence ----
+export * from './indexer.js';
+export * from './smart-reader.js';
+export * from './relevance.js';
+export * from './git-changes.js';
