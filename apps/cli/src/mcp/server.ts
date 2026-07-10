@@ -18,8 +18,10 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import path from 'node:path';
 import {
-  requireOmniDir,
+  resolveOmniRoot,
+  OMNICODE_DIR,
   GitWatcher,
   ProfileManager,
   getOrBuildIndex,
@@ -40,10 +42,9 @@ export interface McpServerOptions {
  */
 export async function startMcpServer(options: McpServerOptions = {}): Promise<void> {
   const projectRoot = process.cwd();
-  const omniDir = requireOmniDir(projectRoot);
 
   const server = new Server(
-    { name: 'omnicontext-mcp', version: '0.1.2' },
+    { name: 'omnicontext-mcp', version: '0.1.3' },
     { capabilities: { resources: {}, tools: {} } },
   );
 
@@ -52,9 +53,23 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     resources: listResources(),
   }));
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
-    contents: [readResource(request.params.uri, omniDir, projectRoot)],
-  }));
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const root = resolveOmniRoot(projectRoot);
+    if (!root) {
+      if (request.params.uri === 'context://instructions') {
+        return {
+          contents: [readResource(request.params.uri, '', projectRoot)],
+        };
+      }
+      throw new Error(
+        'OmniContext not initialized. Run "omni init" in your project root first.',
+      );
+    }
+    const omniDir = path.join(root, OMNICODE_DIR);
+    return {
+      contents: [readResource(request.params.uri, omniDir, projectRoot)],
+    };
+  });
 
   // ---- Tools ----
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -63,6 +78,20 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+    const root = resolveOmniRoot(projectRoot);
+
+    const noOmniDirTools = ['search_codebase', 'read_file_smart', 'get_changed_files'];
+    if (!root && !noOmniDirTools.includes(request.params.name)) {
+      return {
+        content: [{
+          type: 'text',
+          text: 'Error: OmniContext not initialized. Run "omni init" in your project root first.',
+        }],
+        isError: true,
+      };
+    }
+
+    const omniDir = root ? path.join(root, OMNICODE_DIR) : '';
     const result = await executeTool(request.params.name, args, omniDir, projectRoot);
     return result as any;
   });
@@ -75,10 +104,16 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     gitWatcher = new GitWatcher(projectRoot);
 
     gitWatcher.on('branch-changed', (event: BranchChangeEvent) => {
-      profileManager.swapProfile(event.oldBranch, event.newBranch);
-      process.stderr.write(
-        `[omnicontext] Branch switched: ${event.oldBranch ?? 'detached'} → ${event.newBranch ?? 'detached'}\n`,
-      );
+      try {
+        profileManager.swapProfile(event.oldBranch, event.newBranch);
+        process.stderr.write(
+          `[omnicontext] Branch switched: ${event.oldBranch ?? 'detached'} → ${event.newBranch ?? 'detached'}\n`,
+        );
+      } catch (err: any) {
+        process.stderr.write(
+          `[omnicontext] Error swapping branch profile: ${err.message}\n`,
+        );
+      }
     });
 
     gitWatcher.on('error', (err: Error) => {
