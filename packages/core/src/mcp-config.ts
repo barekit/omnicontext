@@ -109,8 +109,8 @@ export function setupAgentConfig(agentKey: string): SetupResult {
     let config: Record<string, any> = {};
 
     if (fs.existsSync(configPath)) {
-      const raw = fs.readFileSync(configPath, 'utf-8');
-      config = JSON.parse(raw);
+      const raw = fs.readFileSync(configPath, 'utf-8').trim();
+      config = raw ? JSON.parse(raw) : {};
     }
 
     // Ensure mcpServers key exists
