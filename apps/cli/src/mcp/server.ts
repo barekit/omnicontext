@@ -19,6 +19,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import path from 'node:path';
+import fs from 'node:fs';
 import {
   resolveOmniRoot,
   OMNICODE_DIR,
@@ -44,7 +45,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const projectRoot = process.cwd();
 
   const server = new Server(
-    { name: 'omnicontext-mcp', version: '0.1.4' },
+    { name: 'omnicontext-mcp', version: '0.1.5' },
     { capabilities: { resources: {}, tools: {} } },
   );
 
@@ -100,30 +101,39 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   let gitWatcher: GitWatcher | null = null;
 
   if (options.watch) {
-    const profileManager = new ProfileManager(projectRoot);
-    gitWatcher = new GitWatcher(projectRoot);
+    const gitDir = path.join(projectRoot, '.git');
+    const headPath = path.join(gitDir, 'HEAD');
 
-    gitWatcher.on('branch-changed', (event: BranchChangeEvent) => {
-      try {
-        profileManager.swapProfile(event.oldBranch, event.newBranch);
-        process.stderr.write(
-          `[omnicontext] Branch switched: ${event.oldBranch ?? 'detached'} → ${event.newBranch ?? 'detached'}\n`,
-        );
-      } catch (err: any) {
-        process.stderr.write(
-          `[omnicontext] Error swapping branch profile: ${err.message}\n`,
-        );
-      }
-    });
+    if (fs.existsSync(headPath)) {
+      const profileManager = new ProfileManager(projectRoot);
+      gitWatcher = new GitWatcher(projectRoot);
 
-    gitWatcher.on('error', (err: Error) => {
-      process.stderr.write(`[omnicontext] Git watcher error: ${err.message}\n`);
-    });
+      gitWatcher.on('branch-changed', (event: BranchChangeEvent) => {
+        try {
+          profileManager.swapProfile(event.oldBranch, event.newBranch);
+          process.stderr.write(
+            `[omnicontext] Branch switched: ${event.oldBranch ?? 'detached'} → ${event.newBranch ?? 'detached'}\n`,
+          );
+        } catch (err: any) {
+          process.stderr.write(
+            `[omnicontext] Error swapping branch profile: ${err.message}\n`,
+          );
+        }
+      });
 
-    gitWatcher.start();
-    process.stderr.write(
-      `[omnicontext] Git watcher active (branch: ${gitWatcher.getCurrentBranch() ?? 'detached'})\n`,
-    );
+      gitWatcher.on('error', (err: Error) => {
+        process.stderr.write(`[omnicontext] Git watcher error: ${err.message}\n`);
+      });
+
+      gitWatcher.start();
+      process.stderr.write(
+        `[omnicontext] Git watcher active (branch: ${gitWatcher.getCurrentBranch() ?? 'detached'})\n`,
+      );
+    } else {
+      process.stderr.write(
+        `[omnicontext] Git watcher disabled: .git/HEAD not found in ${projectRoot}\n`,
+      );
+    }
   }
 
   // ---- Graceful shutdown ----
@@ -139,9 +149,17 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   // ---- Background Indexing ----
   // Kick off an async index build/load to warm the cache.
-  getOrBuildIndex(projectRoot).catch((err) => {
-    process.stderr.write(`[omnicontext] Background index error: ${err.message}\n`);
-  });
+  // ONLY run indexing if we are inside a valid initialized OmniContext workspace
+  const root = resolveOmniRoot(projectRoot);
+  if (root) {
+    getOrBuildIndex(root).catch((err) => {
+      process.stderr.write(`[omnicontext] Background index error: ${err.message}\n`);
+    });
+  } else {
+    process.stderr.write(
+      `[omnicontext] Codebase indexing skipped: OmniContext not initialized in ${projectRoot}\n`,
+    );
+  }
 
   // ---- Start ----
   const transport = new StdioServerTransport();
