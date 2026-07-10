@@ -14,7 +14,7 @@ import { Command } from 'commander';
 import {
   requireOmniDir,
   readHistory,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const historyCommand = new Command('history')
   .description('View completed/replaced task history')

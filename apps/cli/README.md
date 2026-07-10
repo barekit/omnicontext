@@ -82,7 +82,7 @@ After setup, **agents manage everything automatically**. You never need to set t
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                  Agent Session Lifecycle                    │
-├────────────────────────────────────────────────────────────┤
+├────────────────────────────────────────────────────────────┐
 │                                                            │
 │  1. Agent reads context://summary (last session handoff)   │
 │  2. Agent reads context://active-task (current goal)       │
@@ -98,6 +98,7 @@ After setup, **agents manage everything automatically**. You never need to set t
 │                                                            │
 │  ✅ Task auto-archived to history.jsonl                    │
 │  ✅ Next agent reads the summary and continues             │
+│                                                            │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -192,18 +193,6 @@ Each branch gets its own independent task and blocker state.
 | Claude Code (terminal) | ✅ `omni setup claude-code` | Supported |
 | VS Code (Native MCP) | ✅ `omni setup vscode` | Supported |
 | Aider | Manual config | Supported |
-
-## Project Structure
-
-```
-omnicontext/
-├── packages/core/     # Shared schemas, I/O, git watcher, MCP config
-└── apps/cli/          # CLI + MCP server
-```
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 

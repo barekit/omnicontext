@@ -13,7 +13,7 @@ import {
   appendLogEntry,
   readLogEntries,
   getCurrentBranch,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const logCommand = new Command('log')
   .description('View or append to the activity log')

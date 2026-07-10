@@ -44,7 +44,7 @@ function expandHome(filePath: string): string {
 function getOmnicontextMcpEntry() {
   return {
     command: 'npx',
-    args: ['-y', '@omnicontext/cli', 'mcp', 'start', '--watch'],
+    args: ['-y', '@barekit/omnicontext', 'mcp', 'start', '--watch'],
   };
 }
 

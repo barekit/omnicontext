@@ -66,4 +66,29 @@ export const KNOWN_AGENT_CONFIGS: Record<string, { name: string; configPath: str
     configPath: '~/.codeium/windsurf/mcp_config.json',
     docs: 'https://docs.codeium.com/windsurf/mcp',
   },
+  antigravity: {
+    name: 'Antigravity',
+    configPath: '~/.gemini/config/mcp_config.json',
+    docs: 'https://modelcontextprotocol.io',
+  },
+  cline: {
+    name: 'Cline (VS Code)',
+    configPath: '~/.cline/data/settings/cline_mcp_settings.json',
+    docs: 'https://github.com/cline/cline',
+  },
+  'roo-code': {
+    name: 'Roo Code (VS Code)',
+    configPath: '~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json',
+    docs: 'https://github.com/RooVeterinaryInc/Roo-Cline',
+  },
+  'claude-code': {
+    name: 'Claude Code (CLI)',
+    configPath: '~/.claude.json',
+    docs: 'https://modelcontextprotocol.io',
+  },
+  vscode: {
+    name: 'VS Code (Native MCP)',
+    configPath: '~/Library/Application Support/Code/User/mcp.json',
+    docs: 'https://code.visualstudio.com',
+  },
 };

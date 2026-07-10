@@ -17,7 +17,7 @@ import {
   saveRules,
   appendLogEntry,
   getCurrentBranch,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const rulesCommand = new Command('rules')
   .description('View and manage global project rules')

@@ -17,7 +17,7 @@ import {
   saveContext,
   appendLogEntry,
   getCurrentBranch,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const taskCommand = new Command('task')
   .description('Manage the active task');

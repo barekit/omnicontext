@@ -14,11 +14,11 @@ import { Command } from 'commander';
 import {
   setupAllAgents,
   KNOWN_AGENT_CONFIGS,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const setupCommand = new Command('setup')
   .description('Auto-configure OmniContext MCP server in your AI coding agents')
-  .argument('[agent]', 'Specific agent to configure (cursor, claude-desktop, windsurf)')
+  .argument('[agent]', 'Specific agent to configure (cursor, claude-desktop, windsurf, antigravity, cline, roo-code, claude-code, vscode)')
   .action((agent?: string) => {
     console.log('🔌 Setting up OmniContext MCP server...\n');
 

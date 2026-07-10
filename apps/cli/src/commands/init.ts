@@ -19,12 +19,12 @@ import {
   getCurrentBranch,
   setupAllAgents,
   getOrBuildIndex,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const initCommand = new Command('init')
   .description('Initialize OmniContext in the current directory')
   .option('--force', 'Re-initialize even if .omnicode already exists')
-  .option('--setup-mcp [agent]', 'Auto-configure MCP in AI coding agents (cursor, claude-desktop, windsurf)')
+  .option('--setup-mcp [agent]', 'Auto-configure MCP in AI coding agents (cursor, claude-desktop, windsurf, antigravity, cline, roo-code, claude-code, vscode)')
   .action(async (opts) => {
     const cwd = process.cwd();
 

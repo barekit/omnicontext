@@ -24,7 +24,7 @@ import {
   ProfileManager,
   getOrBuildIndex,
   type BranchChangeEvent,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 import { listResources, readResource } from './resources.js';
 import { listTools, executeTool } from './tools.js';
 
@@ -43,7 +43,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const omniDir = requireOmniDir(projectRoot);
 
   const server = new Server(
-    { name: 'omnicontext-mcp', version: '0.1.0' },
+    { name: 'omnicontext-mcp', version: '0.1.2' },
     { capabilities: { resources: {}, tools: {} } },
   );
 

@@ -53,7 +53,7 @@ import {
   findRelevantFiles,
   formatRelevantFilesCompact,
   getChangedFiles,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 // ---------------------------------------------------------------------------
 // Helpers

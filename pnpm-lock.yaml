@@ -20,12 +20,12 @@ importers:
 
   apps/cli:
     dependencies:
+      '@barekit/omnicontext-core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@modelcontextprotocol/sdk':
         specifier: latest
         version: 1.29.0(zod@4.4.3)
-      '@omnicontext/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       commander:
         specifier: latest
         version: 14.0.3

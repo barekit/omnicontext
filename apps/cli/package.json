@@ -1,6 +1,6 @@
 {
-  "name": "@omnicontext/cli",
-  "version": "0.1.0",
+  "name": "@barekit/omnicontext",
+  "version": "0.1.2",
   "description": "CLI and MCP server for OmniContext — AI agent project memory layer",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "latest",
-    "@omnicontext/core": "workspace:*",
+    "@barekit/omnicontext-core": "workspace:*",
     "commander": "latest"
   },
   "devDependencies": {

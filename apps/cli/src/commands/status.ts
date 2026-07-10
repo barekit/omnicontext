@@ -11,7 +11,7 @@ import {
   loadRules,
   readLogEntries,
   getCurrentBranch,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export const statusCommand = new Command('status')
   .description('Show a summary of the current OmniContext state')

@@ -1,6 +1,6 @@
 {
-  "name": "@omnicontext/core",
-  "version": "0.1.0",
+  "name": "@barekit/omnicontext-core",
+  "version": "0.1.2",
   "description": "Shared schemas, utilities, and git watcher for OmniContext",
   "type": "module",
   "license": "MIT",
@@ -15,6 +15,15 @@
     "url": "https://github.com/barekit/omnicontext/issues"
   },
   "homepage": "https://github.com/barekit/omnicontext/tree/main/packages/core#readme",
+  "keywords": [
+    "mcp",
+    "ai",
+    "context",
+    "cursor",
+    "claude",
+    "aider",
+    "coding-agent"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc -w",

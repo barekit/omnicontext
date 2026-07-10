@@ -25,7 +25,7 @@ import {
   loadSummary,
   detectArchitecture,
   formatArchitectureCompact,
-} from '@omnicontext/core';
+} from '@barekit/omnicontext-core';
 
 export interface ResourceDefinition {
   uri: string;
