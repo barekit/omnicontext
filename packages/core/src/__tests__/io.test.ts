@@ -53,6 +53,8 @@ describe('scaffoldOmniDir', () => {
     // Verify agent rules files are created
     expect(fs.existsSync(path.join(tmpDir, '.cursorrules'))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, '.clinerules'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, '.windsurfrules'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, 'CLAUDE.md'))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, '.agents', 'AGENTS.md'))).toBe(true);
 
     const cursorRulesContent = fs.readFileSync(path.join(tmpDir, '.cursorrules'), 'utf-8');

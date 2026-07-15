@@ -294,6 +294,8 @@ You are connected to an OmniContext MCP server. To ensure context is preserved a
   const files = [
     { path: path.join(projectRoot, '.cursorrules') },
     { path: path.join(projectRoot, '.clinerules') },
+    { path: path.join(projectRoot, '.windsurfrules') },
+    { path: path.join(projectRoot, 'CLAUDE.md') },
     { path: path.join(projectRoot, '.agents', 'AGENTS.md'), parentDir: path.join(projectRoot, '.agents') },
   ];
 
