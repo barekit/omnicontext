@@ -38,7 +38,7 @@ const program = new Command();
 program
   .name('omni')
   .description('OmniContext — AI agent project memory layer')
-  .version('0.1.2');
+  .version('0.1.6');
 
 // Register command modules
 program.addCommand(initCommand);

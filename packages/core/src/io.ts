@@ -264,7 +264,56 @@ export function scaffoldOmniDir(projectRoot: string): string {
   // Create empty history file
   fs.writeFileSync(path.join(omniDir, HISTORY_FILE), '');
 
+  // Scaffold agent rules files (.cursorrules, .clinerules, .agents/AGENTS.md)
+  ensureAgentRules(projectRoot);
+
   return omniDir;
+}
+
+/**
+ * Ensure rule files exist for major AI agents (Cursor, Cline, Roo Code, and Antigravity)
+ * and contain the OmniContext integration rules.
+ */
+export function ensureAgentRules(projectRoot: string): void {
+  const ruleContent = `
+# OmniContext Integration Rule
+
+You are connected to an OmniContext MCP server. To ensure context is preserved across sessions and tools:
+
+1. **On Session Start**: You MUST immediately call the \`get_context\` tool. This will load the active task, rules, blockers, and handoff summaries.
+2. **During Development**:
+   - If no task is active, call \`set_task\` with the user's current goal.
+   - If you encounter a build error, test failure, or blocker, call \`update_blocker\` immediately with the details.
+   - Once resolved, call \`clear_blockers\`.
+   - Write important decisions to the log using \`add_log_entry\`.
+3. **On Session End**: If the task is completed, call \`set_task_status\` with "completed" and call \`write_summary\` to save a handoff summary for the next agent session.
+`.trim() + '\n';
+
+  const marker = 'OmniContext Integration Rule';
+
+  const files = [
+    { path: path.join(projectRoot, '.cursorrules') },
+    { path: path.join(projectRoot, '.clinerules') },
+    { path: path.join(projectRoot, '.agents', 'AGENTS.md'), parentDir: path.join(projectRoot, '.agents') },
+  ];
+
+  for (const file of files) {
+    // Ensure parent directory exists if specified
+    if (file.parentDir && !fs.existsSync(file.parentDir)) {
+      fs.mkdirSync(file.parentDir, { recursive: true });
+    }
+
+    if (fs.existsSync(file.path)) {
+      const content = fs.readFileSync(file.path, 'utf-8');
+      if (!content.includes(marker)) {
+        // Append to existing file
+        fs.appendFileSync(file.path, `\n\n${ruleContent}`);
+      }
+    } else {
+      // Create new file
+      fs.writeFileSync(file.path, ruleContent);
+    }
+  }
 }
 
 /**

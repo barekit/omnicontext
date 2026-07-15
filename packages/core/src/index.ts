@@ -61,6 +61,7 @@ export {
   saveSummary,
   scaffoldOmniDir,
   ensureGitignore,
+  ensureAgentRules,
   getCurrentBranch,
   type HistoryEntry,
 } from './io.js';

@@ -41,7 +41,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('scaffoldOmniDir', () => {
-  it('creates the .omnicode directory structure', () => {
+  it('creates the .omnicode directory structure and agent rules', () => {
     scaffoldOmniDir(tmpDir);
 
     expect(fs.existsSync(path.join(tmpDir, OMNICODE_DIR))).toBe(true);
@@ -49,6 +49,14 @@ describe('scaffoldOmniDir', () => {
     expect(fs.existsSync(path.join(tmpDir, OMNICODE_DIR, RULES_FILE))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, OMNICODE_DIR, LOG_FILE))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, OMNICODE_DIR, BRANCHES_DIR))).toBe(true);
+
+    // Verify agent rules files are created
+    expect(fs.existsSync(path.join(tmpDir, '.cursorrules'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, '.clinerules'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, '.agents', 'AGENTS.md'))).toBe(true);
+
+    const cursorRulesContent = fs.readFileSync(path.join(tmpDir, '.cursorrules'), 'utf-8');
+    expect(cursorRulesContent).toContain('OmniContext Integration Rule');
   });
 
   it('creates valid task.json', () => {

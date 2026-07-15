@@ -1,6 +1,6 @@
 {
   "name": "@barekit/omnicontext",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "CLI and MCP server for OmniContext — AI agent project memory layer",
   "type": "module",
   "license": "MIT",

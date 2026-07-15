@@ -45,7 +45,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const projectRoot = process.cwd();
 
   const server = new Server(
-    { name: 'omnicontext-mcp', version: '0.1.5' },
+    { name: 'omnicontext-mcp', version: '0.1.6' },
     { capabilities: { resources: {}, tools: {} } },
   );
 
