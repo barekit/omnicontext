@@ -20,8 +20,8 @@ You're working with Cursor on a database migration. It hits an error. You switch
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Cursor     │     │ Claude Code │     │    Aider    │
-│   (IDE)      │     │ (Terminal)  │     │  (Terminal) │
+│   Cursor     │     │ Claude Code │     │  Antigravity│
+│   (IDE)      │     │ (Terminal)  │     │    (IDE)    │
 └──────┬───────┘     └──────┬──────┘     └──────┬──────┘
        │                    │                    │
        └────────────┬───────┘────────────────────┘
@@ -39,6 +39,8 @@ You're working with Cursor on a database migration. It hits an error. You switch
             │  ├─ log.jsonl  │
             │  ├─ history.jsonl│
             │  ├─ summary.md │
+            │  ├─ map.json   │
+            │  ├─ sessions/  │
             │  └─ branches/  │
             └────────────────┘
 ```
@@ -51,7 +53,7 @@ You're working with Cursor on a database migration. It hits an error. You switch
 npx @barekit/omnicontext init --setup-mcp
 ```
 
-This creates the `.omnicode/` directory **and** auto-configures MCP in any detected agents (Cursor, Claude Desktop, Windsurf).
+This creates the `.omnicode/` directory, scaffolds agent rules files (`.cursorrules`, `.clinerules`, `CLAUDE.md`, `.windsurfrules`, `.agents/AGENTS.md`), **and** auto-configures MCP in any detected agents.
 
 **That's it.** No global install, no manual JSON editing. Your AI agents now have persistent project memory.
 
@@ -84,20 +86,19 @@ After setup, **agents manage everything automatically**. You never need to set t
 │                  Agent Session Lifecycle                    │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
-│  1. Agent reads context://summary (last session handoff)   │
-│  2. Agent reads context://active-task (current goal)       │
-│  3. Agent reads context://rules (project constraints)      │
+│  1. Agent registers session & checks multi-chat locks      │
+│  2. Agent calls get_context (task, rules, log, map)       │
 │                                                            │
-│  4. If no task → Agent calls set_task("User's request")    │
-│  5. Agent works... logs blockers, progress, decisions      │
-│  6. On error → Agent calls update_blocker()                │
-│  7. On fix → Agent calls clear_blockers()                  │
+│  3. If no task → Agent calls set_task("User's request")    │
+│  4. Agent works... logs blockers, progress, decisions      │
+│  5. On error → Agent calls update_blocker()                │
+│  6. On fix → Agent calls clear_blockers()                  │
 │                                                            │
-│  8. On completion → set_task_status("completed")           │
-│  9. Agent calls write_summary() for next agent             │
+│  7. On completion → set_task_status("completed")           │
+│  8. Agent calls write_summary() for next agent             │
 │                                                            │
 │  ✅ Task auto-archived to history.jsonl                    │
-│  ✅ Next agent reads the summary and continues             │
+│  ✅ Next agent reads summary + map and continues seamlessly│
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -108,7 +109,7 @@ After setup, **agents manage everything automatically**. You never need to set t
 | `omni init` | Initialize `.omnicode/` in the current project |
 | `omni init --setup-mcp` | Initialize + auto-configure agents |
 | `omni init --force` | Re-initialize (overwrites existing state) |
-| `omni setup [agent]` | Auto-configure MCP in Cursor, Claude Desktop, Windsurf |
+| `omni setup [agent]` | Auto-configure MCP in Cursor, Claude, Windsurf, etc. |
 | `omni task set <title>` | Set the active task |
 | `omni task get` | Print the current active task |
 | `omni task clear` | Remove the active task |
@@ -120,6 +121,9 @@ After setup, **agents manage everything automatically**. You never need to set t
 | `omni rules` | Print global project rules |
 | `omni rules append <rule>` | Add a new rule |
 | `omni rules edit` | Open rules.md in `$EDITOR` |
+| `omni clean` | Run storage maintenance, compact logs, prune orphaned branches |
+| `omni clean --dry-run` | Inspect disk usage and health report |
+| `omni map` | Generate and display codebase tree map & symbol index |
 | `omni status` | Dashboard summary of current state |
 | `omni mcp start` | Start the MCP server |
 | `omni mcp start --watch` | Start with git branch watching |
@@ -130,6 +134,8 @@ After setup, **agents manage everything automatically**. You never need to set t
 
 | URI | Description |
 |-----|-------------|
+| `context://boot` | Complete compact boot context (for auto-attachment) |
+| `context://sessions` | Active multi-chat agent session locks |
 | `context://instructions` | Behavioral contract — how agents should use OmniContext |
 | `context://active-task` | Current task.json content |
 | `context://rules` | Project rules (rules.md) |
@@ -142,6 +148,10 @@ After setup, **agents manage everything automatically**. You never need to set t
 
 | Tool | Description |
 |------|-------------|
+| `get_context` | ⚡ One-call boot: task, rules, activity, map, and handoff (~200 tokens) |
+| `register_session` | Register session & detect multi-chat collisions on branch |
+| `end_session` | Unregister active agent session lock |
+| `get_codebase_map` | Get structured codebase tree map & symbol exports |
 | `set_task` | Create or replace the active task (auto-archives old task) |
 | `update_blocker` | Log an error or blocker (auto-creates task if needed) |
 | `set_task_status` | Mark task as `active`, `completed`, or `blocked` |
@@ -153,14 +163,12 @@ After setup, **agents manage everything automatically**. You never need to set t
 | `get_history` | Read completed task history |
 | `write_summary` | Write a handoff summary for the next agent |
 
-## Git-Aware Context Switching
+## Multi-Chat Session Coordination
 
-When you start the MCP server with `--watch`, OmniContext monitors your `.git/HEAD` file. When you switch branches, it automatically:
-
-1. Saves the current task/blockers under `.omnicode/branches/<old-branch>/`
-2. Loads the saved context for the new branch (or creates a fresh one)
-
-Each branch gets its own independent task and blocker state.
+When running multiple AI chat threads in the same project:
+* OmniContext registers process session locks under `.omnicode/sessions/`.
+* `get_context` automatically warns if another agent chat is currently working on the same branch.
+* Expired sessions (>30 min inactive) are automatically cleaned up in the background.
 
 ## The `.omnicode/` Standard
 
@@ -171,7 +179,10 @@ Each branch gets its own independent task and blocker state.
 ├── log.jsonl          # Append-only activity log (auto-compacted at 200 entries)
 ├── log.archive.jsonl  # Archived log entries
 ├── history.jsonl      # Completed/replaced task history
+├── history.archive.jsonl # Archived task history
 ├── summary.md         # Handoff summary from last agent session
+├── map.json           # Cached codebase file map & symbol index
+├── sessions/          # Active multi-chat agent session locks
 └── branches/          # Per-branch context snapshots
     ├── main/
     │   └── task.json
@@ -197,7 +208,7 @@ Each branch gets its own independent task and blocker state.
 
 ```
 omnicontext/
-├── packages/core/     # Shared schemas, I/O, git watcher, MCP config
+├── packages/core/     # Shared schemas, I/O, codebase map, session registry, git watcher
 └── apps/cli/          # CLI + MCP server
 ```
 

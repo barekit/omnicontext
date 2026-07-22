@@ -10,39 +10,6 @@ OmniContext eliminates "context drift" when switching between AI coding assistan
 
 ---
 
-## The Problem
-
-You're working with Cursor on a database migration. It hits an error. You switch to Claude Code in your terminal — but Claude has no idea what you were doing or what went wrong. You waste 5 minutes re-explaining context.
-
-**OmniContext fixes this.** Your task, blockers, and project rules persist locally in a `.omnicode/` directory and are served to any MCP-compatible agent automatically.
-
-## How It Works
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Cursor     │     │ Claude Code │     │    Aider    │
-│   (IDE)      │     │ (Terminal)  │     │  (Terminal) │
-└──────┬───────┘     └──────┬──────┘     └──────┬──────┘
-       │                    │                    │
-       └────────────┬───────┘────────────────────┘
-                    │
-            ┌───────▼────────┐
-            │  OmniContext   │
-            │  MCP Server    │
-            │  (local stdio) │
-            └───────┬────────┘
-                    │
-            ┌───────▼────────┐
-            │  .omnicode/    │
-            │  ├─ task.json  │
-            │  ├─ rules.md   │
-            │  ├─ log.jsonl  │
-            │  ├─ history.jsonl│
-            │  ├─ summary.md │
-            │  └─ branches/  │
-            └────────────────┘
-```
-
 ## Quick Start
 
 ### 1. Initialize + Auto-Configure (one command)
@@ -51,9 +18,7 @@ You're working with Cursor on a database migration. It hits an error. You switch
 npx @barekit/omnicontext init --setup-mcp
 ```
 
-This creates the `.omnicode/` directory **and** auto-configures MCP in any detected agents (Cursor, Claude Desktop, Windsurf).
-
-**That's it.** No global install, no manual JSON editing. Your AI agents now have persistent project memory.
+This creates the `.omnicode/` directory, scaffolds agent rules files (`.cursorrules`, `.clinerules`, `CLAUDE.md`, `.windsurfrules`, `.agents/AGENTS.md`), **and** auto-configures MCP in any detected agents.
 
 ### Alternative: Step-by-Step
 
@@ -63,136 +28,60 @@ npx @barekit/omnicontext init
 
 # Auto-configure all detected agents
 npx @barekit/omnicontext setup
-
-# Or configure a specific agent
-npx @barekit/omnicontext setup cursor
-```
-
-### If you prefer a global install
-
-```bash
-npm install -g @barekit/omnicontext
-omni init --setup-mcp
-```
-
-## How Agents Use OmniContext (Autonomous)
-
-After setup, **agents manage everything automatically**. You never need to set tasks or log blockers yourself:
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                  Agent Session Lifecycle                    │
-├────────────────────────────────────────────────────────────┐
-│                                                            │
-│  1. Agent reads context://summary (last session handoff)   │
-│  2. Agent reads context://active-task (current goal)       │
-│  3. Agent reads context://rules (project constraints)      │
-│                                                            │
-│  4. If no task → Agent calls set_task("User's request")    │
-│  5. Agent works... logs blockers, progress, decisions      │
-│  6. On error → Agent calls update_blocker()                │
-│  7. On fix → Agent calls clear_blockers()                  │
-│                                                            │
-│  8. On completion → set_task_status("completed")           │
-│  9. Agent calls write_summary() for next agent             │
-│                                                            │
-│  ✅ Task auto-archived to history.jsonl                    │
-│  ✅ Next agent reads the summary and continues             │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
 ```
 
 ## CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `omni init` | Initialize `.omnicode/` in the current project |
+| `omni init` | Initialize `.omnicode/` in current project |
 | `omni init --setup-mcp` | Initialize + auto-configure agents |
-| `omni init --force` | Re-initialize (overwrites existing state) |
-| `omni setup [agent]` | Auto-configure MCP in Cursor, Claude Desktop, Windsurf |
-| `omni task set <title>` | Set the active task |
-| `omni task get` | Print the current active task |
-| `omni task clear` | Remove the active task |
-| `omni task blocker <msg>` | Add a blocker to the active task |
-| `omni log [message]` | View or append to the activity log |
-| `omni log -n 50` | Show last 50 log entries |
+| `omni setup [agent]` | Auto-configure MCP in Cursor, Claude, Windsurf, etc. |
+| `omni task set <title>` | Set active task |
+| `omni task get` | Print active task |
+| `omni task clear` | Remove active task |
+| `omni task blocker <msg>` | Add blocker |
+| `omni log [message]` | View/append to log |
 | `omni history` | View completed task history |
-| `omni history -n 25` | Show last 25 tasks |
-| `omni rules` | Print global project rules |
-| `omni rules append <rule>` | Add a new rule |
-| `omni rules edit` | Open rules.md in `$EDITOR` |
-| `omni status` | Dashboard summary of current state |
-| `omni mcp start` | Start the MCP server |
+| `omni rules` | View project rules |
+| `omni clean` | Storage maintenance, log compaction, branch pruning |
+| `omni clean --dry-run` | Inspect disk usage and health report |
+| `omni map` | Generate/display codebase tree map & symbol index |
+| `omni status` | Dashboard summary |
+| `omni mcp start` | Start MCP server |
 | `omni mcp start --watch` | Start with git branch watching |
 
 ## MCP Resources & Tools
 
-### Resources (read by agents)
+### Resources
 
 | URI | Description |
 |-----|-------------|
-| `context://instructions` | Behavioral contract — how agents should use OmniContext |
+| `context://boot` | Complete compact boot context |
+| `context://sessions` | Active multi-chat agent session locks |
+| `context://instructions` | Agent behavioral instructions |
 | `context://active-task` | Current task.json content |
 | `context://rules` | Project rules (rules.md) |
-| `context://log` | Recent activity log entries |
+| `context://log` | Recent activity log |
 | `context://history` | Completed task history |
-| `context://summary` | Handoff summary from last agent session |
+| `context://summary` | Handoff summary |
 | `context://status` | Structured status summary |
 
-### Tools (called by agents)
+### Tools
 
 | Tool | Description |
 |------|-------------|
-| `set_task` | Create or replace the active task (auto-archives old task) |
-| `update_blocker` | Log an error or blocker (auto-creates task if needed) |
-| `set_task_status` | Mark task as `active`, `completed`, or `blocked` |
-| `update_state` | Update task title and/or status |
-| `update_rules` | Append a rule to rules.md |
-| `add_log_entry` | Write to the activity log |
-| `clear_blockers` | Remove all blockers from the active task |
-| `get_task` | Read the current active task |
-| `get_history` | Read completed task history |
-| `write_summary` | Write a handoff summary for the next agent |
-
-## Git-Aware Context Switching
-
-When you start the MCP server with `--watch`, OmniContext monitors your `.git/HEAD` file. When you switch branches, it automatically:
-
-1. Saves the current task/blockers under `.omnicode/branches/<old-branch>/`
-2. Loads the saved context for the new branch (or creates a fresh one)
-
-Each branch gets its own independent task and blocker state.
-
-## The `.omnicode/` Standard
-
-```
-.omnicode/
-├── task.json          # Active task, status, and blockers
-├── rules.md           # Global rules for AI agents
-├── log.jsonl          # Append-only activity log (auto-compacted at 200 entries)
-├── log.archive.jsonl  # Archived log entries
-├── history.jsonl      # Completed/replaced task history
-├── summary.md         # Handoff summary from last agent session
-└── branches/          # Per-branch context snapshots
-    ├── main/
-    │   └── task.json
-    └── feature__auth/
-        └── task.json
-```
-
-## Supported Agents
-
-| Agent | Auto-Setup | Status |
-|-------|-----------|--------|
-| Cursor | ✅ `omni setup cursor` | Supported |
-| Claude Desktop | ✅ `omni setup claude-desktop` | Supported |
-| Windsurf | ✅ `omni setup windsurf` | Supported |
-| Antigravity | ✅ `omni setup antigravity` | Supported |
-| Cline (VS Code) | ✅ `omni setup cline` | Supported |
-| Roo Code (VS Code) | ✅ `omni setup roo-code` | Supported |
-| Claude Code (terminal) | ✅ `omni setup claude-code` | Supported |
-| VS Code (Native MCP) | ✅ `omni setup vscode` | Supported |
-| Aider | Manual config | Supported |
+| `get_context` | ⚡ One-call boot: task, rules, activity, map, handoff (~200 tokens) |
+| `register_session` | Register session & detect multi-chat collisions |
+| `end_session` | Unregister active agent session lock |
+| `get_codebase_map` | Get structured codebase map & symbol exports |
+| `set_task` | Create or replace active task |
+| `update_blocker` | Log error/blocker |
+| `set_task_status` | Mark task active, completed, or blocked |
+| `update_rules` | Add rule to rules.md |
+| `add_log_entry` | Write to activity log |
+| `clear_blockers` | Remove blockers |
+| `write_summary` | Write handoff summary |
 
 ## License
 
