@@ -19,12 +19,14 @@ export {
   AgentSessionSchema,
   validateState,
   safeValidateState,
+  SessionSchema,
   type Blocker,
   type Task,
   type TaskStatus,
   type LogEntry,
   type ProjectContext,
   type AgentSession,
+  type Session,
 } from './schemas.js';
 
 // ---- Constants ----
@@ -35,12 +37,20 @@ export {
   LOG_FILE,
   LOG_ARCHIVE_FILE,
   HISTORY_FILE,
+  HISTORY_ARCHIVE_FILE,
   SUMMARY_FILE,
   BRANCHES_DIR,
+  SESSIONS_DIR,
+  SESSION_EXPIRY_MINUTES,
+  MAP_FILE,
+  MAP_MAX_AGE_HOURS,
+  BLOCKER_STALE_DAYS,
   SCHEMA_VERSION,
   DEFAULT_RULES_CONTENT,
   LOG_COMPACTION_THRESHOLD,
   LOG_COMPACTION_KEEP,
+  HISTORY_COMPACTION_THRESHOLD,
+  HISTORY_COMPACTION_KEEP,
   KNOWN_AGENT_CONFIGS,
 } from './constants.js';
 
@@ -57,13 +67,24 @@ export {
   maybeCompactLog,
   appendHistory,
   readHistory,
+  maybeCompactHistory,
   loadSummary,
   saveSummary,
   scaffoldOmniDir,
   ensureGitignore,
   ensureAgentRules,
   getCurrentBranch,
+  getSessionsDir,
+  registerSession,
+  listActiveSessions,
+  updateSessionHeartbeat,
+  removeSession,
+  getGitBranches,
+  pruneOrphanedBranches,
+  getOmniDirSizeBytes,
+  getHealthReport,
   type HistoryEntry,
+  type HealthReport,
 } from './io.js';
 
 // ---- Git watcher ----
@@ -86,6 +107,9 @@ export {
   formatArchitectureCompact,
   type ProjectArchitecture,
 } from './architecture.js';
+
+// ---- Codebase Map ----
+export * from './codebase-map.js';
 
 // ---- Codebase Intelligence ----
 export * from './indexer.js';

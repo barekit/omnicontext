@@ -90,7 +90,7 @@ export const ProjectContextSchema = z.object({
 export type ProjectContext = z.infer<typeof ProjectContextSchema>;
 
 // ---------------------------------------------------------------------------
-// Agent Session (tracking which agent last interacted)
+// Agent Session & Multi-Chat Session Registry
 // ---------------------------------------------------------------------------
 
 /**
@@ -98,7 +98,7 @@ export type ProjectContext = z.infer<typeof ProjectContextSchema>;
  * Used for debugging handoff issues and understanding agent usage patterns.
  */
 export const AgentSessionSchema = z.object({
-  /** Agent identifier (e.g. "cursor", "claude-code", "aider"). */
+  /** Agent identifier (e.g. "cursor", "claude-code", "antigravity"). */
   agentId: z.string(),
   /** When the session started. */
   startedAt: z.string().datetime(),
@@ -107,6 +107,29 @@ export const AgentSessionSchema = z.object({
 });
 
 export type AgentSession = z.infer<typeof AgentSessionSchema>;
+
+/**
+ * Active concurrent session record stored in `.omnicode/sessions/<id>.json`.
+ * Used for multi-chat coordination, collision detection, and stale session cleanup.
+ */
+export const SessionSchema = z.object({
+  /** Unique session ID. */
+  id: z.string(),
+  /** Agent identifier (e.g. "antigravity", "cursor", "claude-code"). */
+  agentId: z.string(),
+  /** Current task title being worked on in this session. */
+  taskTitle: z.string().optional(),
+  /** Process ID of the MCP server. */
+  pid: z.number().optional(),
+  /** ISO-8601 timestamp of session start. */
+  startedAt: z.string(),
+  /** ISO-8601 timestamp of last heartbeat / activity. */
+  lastActiveAt: z.string(),
+  /** Git branch at session start. */
+  branch: z.string().optional(),
+});
+
+export type Session = z.infer<typeof SessionSchema>;
 
 // ---------------------------------------------------------------------------
 // Validation helpers

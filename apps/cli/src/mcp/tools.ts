@@ -31,6 +31,7 @@ import {
   type Blocker,
   type Task,
   type TaskStatus,
+  type Session,
   loadContext,
   saveContext,
   loadRules,
@@ -44,6 +45,16 @@ import {
   loadSummary,
   detectArchitecture,
   formatArchitectureCompact,
+  // Session Registry
+  registerSession,
+  listActiveSessions,
+  updateSessionHeartbeat,
+  removeSession,
+  // Codebase Map
+  generateCodebaseMap,
+  loadCachedMap,
+  saveCachedMap,
+  formatCodebaseMapCompact,
   // Codebase Intelligence
   searchIndex,
   getOrBuildIndex,
@@ -122,6 +133,21 @@ async function buildCompactContext(omniDir: string, projectRoot: string): Promis
 
   // Line 1: Project + branch
   lines.push(`# ${arch.projectName ?? 'Project'} | branch: ${branch ?? 'detached'}`);
+
+  // Concurrent Agent Session Warnings
+  try {
+    const activeSessions = listActiveSessions(omniDir);
+    if (activeSessions.length > 0) {
+      const currentPid = process.pid;
+      const otherSessions = activeSessions.filter((s) => s.pid !== currentPid);
+      if (otherSessions.length > 0) {
+        lines.push(
+          `⚠️ ${otherSessions.length} other agent session(s) active on this branch: ` +
+            otherSessions.map((s) => `${s.agentId}${s.taskTitle ? ` ("${s.taskTitle}")` : ''}`).join(', '),
+        );
+      }
+    }
+  } catch {}
 
   // Architecture (compact)
   const archLine = formatArchitectureCompact(arch);
@@ -219,6 +245,55 @@ export interface ToolDefinition {
 
 export function listTools(): ToolDefinition[] {
   return [
+    {
+      name: 'register_session',
+      description:
+        'Register your agent session for multi-chat coordination. Call this on session start ' +
+        'to establish a lock and receive warnings if another agent session is active on the same branch.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          agentId: {
+            type: 'string',
+            description: 'Your agent identifier (e.g. "antigravity", "cursor", "claude-code")',
+          },
+          taskTitle: {
+            type: 'string',
+            description: 'Optional initial task title you are working on',
+          },
+        },
+        required: ['agentId'],
+      },
+    },
+    {
+      name: 'end_session',
+      description: 'Clean up your active session lock on task completion or exit.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: {
+            type: 'string',
+            description: 'The session ID returned during register_session',
+          },
+        },
+        required: ['sessionId'],
+      },
+    },
+    {
+      name: 'get_codebase_map',
+      description:
+        'Get a structured map of the codebase (file tree, one-line file summaries, and exported symbols). ' +
+        'Use this to understand the project structure without scanning directories manually.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          refresh: {
+            type: 'boolean',
+            description: 'Force re-scanning the codebase (default: false, uses 24h cache)',
+          },
+        },
+      },
+    },
     {
       name: 'get_context',
       description:
@@ -452,6 +527,64 @@ export async function executeTool(
   const branch = getCurrentBranch(projectRoot);
 
   switch (toolName) {
+    // ------------------------------------------------------------------
+    // SESSION MANAGEMENT & MULTI-CHAT COORDINATION
+    // ------------------------------------------------------------------
+    case 'register_session': {
+      const agentId = String(args.agentId);
+      const taskTitle = args.taskTitle ? String(args.taskTitle) : undefined;
+      const sessionId = (args.sessionId as string) || randomUUID();
+      const now = new Date().toISOString();
+
+      const session: Session = {
+        id: sessionId,
+        agentId,
+        taskTitle,
+        pid: process.pid,
+        startedAt: now,
+        lastActiveAt: now,
+        branch: branch ?? undefined,
+      };
+
+      if (omniDir) {
+        registerSession(omniDir, session);
+
+        // Check for concurrent active sessions
+        const active = listActiveSessions(omniDir);
+        const otherSessions = active.filter((s) => s.id !== sessionId);
+
+        let msg = `Session registered (id: ${sessionId})`;
+        if (otherSessions.length > 0) {
+          msg += `\n⚠️ WARNING: ${otherSessions.length} other session(s) active on this project:`;
+          for (const s of otherSessions) {
+            msg += `\n- Agent: ${s.agentId}${s.taskTitle ? ` | Task: "${s.taskTitle}"` : ''} (branch: ${s.branch ?? 'unknown'})`;
+          }
+        }
+        return text(msg);
+      }
+      return text(`Session registered (id: ${sessionId})`);
+    }
+
+    case 'end_session': {
+      const sessionId = String(args.sessionId);
+      if (omniDir) {
+        removeSession(omniDir, sessionId);
+      }
+      return text(`Session ended (${sessionId})`);
+    }
+
+    case 'get_codebase_map': {
+      const refresh = Boolean(args.refresh);
+      let map = refresh ? null : (omniDir ? loadCachedMap(omniDir) : null);
+      if (!map) {
+        map = generateCodebaseMap(projectRoot);
+        if (omniDir) {
+          saveCachedMap(omniDir, map);
+        }
+      }
+      return text(formatCodebaseMapCompact(map));
+    }
+
     // ------------------------------------------------------------------
     // COMPACT CONTEXT — single-call boot (~200 tokens)
     // ------------------------------------------------------------------

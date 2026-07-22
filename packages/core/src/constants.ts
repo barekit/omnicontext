@@ -42,6 +42,30 @@ export const LOG_COMPACTION_THRESHOLD = 200;
 /** Number of recent entries to keep after compaction. */
 export const LOG_COMPACTION_KEEP = 50;
 
+/** Maximum history entries to keep in history.jsonl before compaction. */
+export const HISTORY_COMPACTION_THRESHOLD = 100;
+
+/** Number of recent history entries to keep after compaction. */
+export const HISTORY_COMPACTION_KEEP = 20;
+
+/** Archive file for compacted history entries. */
+export const HISTORY_ARCHIVE_FILE = 'history.archive.jsonl';
+
+/** Number of days before a blocker is considered stale. */
+export const BLOCKER_STALE_DAYS = 3;
+
+/** Directory holding active agent session lock files. */
+export const SESSIONS_DIR = 'sessions';
+
+/** Number of minutes before an inactive agent session is considered expired. */
+export const SESSION_EXPIRY_MINUTES = 30;
+
+/** Name of the cached codebase map file. */
+export const MAP_FILE = 'map.json';
+
+/** Maximum age (in hours) before the codebase map is re-generated. */
+export const MAP_MAX_AGE_HOURS = 24;
+
 // ---------------------------------------------------------------------------
 // Known MCP agent config paths (macOS)
 // ---------------------------------------------------------------------------

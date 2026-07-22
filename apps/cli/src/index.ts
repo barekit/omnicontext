@@ -31,6 +31,8 @@ import { logCommand } from './commands/log.js';
 import { rulesCommand } from './commands/rules.js';
 import { historyCommand } from './commands/history.js';
 import { statusCommand } from './commands/status.js';
+import { cleanCommand } from './commands/clean.js';
+import { mapCommand } from './commands/map.js';
 import { startMcpServer } from './mcp/server.js';
 
 const program = new Command();
@@ -38,7 +40,7 @@ const program = new Command();
 program
   .name('omni')
   .description('OmniContext — AI agent project memory layer')
-  .version('0.1.8');
+  .version('0.2.0');
 
 // Register command modules
 program.addCommand(initCommand);
@@ -48,6 +50,8 @@ program.addCommand(logCommand);
 program.addCommand(rulesCommand);
 program.addCommand(historyCommand);
 program.addCommand(statusCommand);
+program.addCommand(cleanCommand);
+program.addCommand(mapCommand);
 
 // MCP server command
 const mcpCommand = new Command('mcp')

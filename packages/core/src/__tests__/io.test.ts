@@ -19,11 +19,19 @@ import {
   readLogEntries,
   resolveOmniRoot,
   getCurrentBranch,
+  registerSession,
+  listActiveSessions,
+  removeSession,
+  getHealthReport,
+  pruneOrphanedBranches,
+  generateCodebaseMap,
+  formatCodebaseMapCompact,
   OMNICODE_DIR,
   TASK_FILE,
   RULES_FILE,
   LOG_FILE,
   BRANCHES_DIR,
+  SESSIONS_DIR,
 } from '../index.js';
 
 let tmpDir: string;
@@ -256,5 +264,101 @@ describe('getCurrentBranch', () => {
 
     const branch = getCurrentBranch(tmpDir);
     expect(branch).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session Registry
+// ---------------------------------------------------------------------------
+
+describe('Session Registry', () => {
+  it('registers and lists active sessions', () => {
+    const omniDir = scaffoldOmniDir(tmpDir);
+    const now = new Date().toISOString();
+
+    registerSession(omniDir, {
+      id: 'session-1',
+      agentId: 'antigravity',
+      taskTitle: 'Build feature',
+      startedAt: now,
+      lastActiveAt: now,
+      branch: 'main',
+    });
+
+    const active = listActiveSessions(omniDir);
+    expect(active.length).toBe(1);
+    expect(active[0].id).toBe('session-1');
+    expect(active[0].agentId).toBe('antigravity');
+  });
+
+  it('removes session on end', () => {
+    const omniDir = scaffoldOmniDir(tmpDir);
+    const now = new Date().toISOString();
+
+    registerSession(omniDir, {
+      id: 'session-1',
+      agentId: 'cursor',
+      startedAt: now,
+      lastActiveAt: now,
+    });
+
+    expect(listActiveSessions(omniDir).length).toBe(1);
+    removeSession(omniDir, 'session-1');
+    expect(listActiveSessions(omniDir).length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Health Report & Branch Pruning
+// ---------------------------------------------------------------------------
+
+describe('Health & Maintenance', () => {
+  it('generates accurate health report', () => {
+    const omniDir = scaffoldOmniDir(tmpDir);
+    appendLogEntry(omniDir, {
+      timestamp: new Date().toISOString(),
+      source: 'cli',
+      message: 'Test log',
+    });
+
+    const report = getHealthReport(omniDir, tmpDir);
+    expect(report.logEntries).toBe(1);
+    expect(report.historyEntries).toBe(0);
+    expect(report.totalDiskBytes).toBeGreaterThan(0);
+  });
+
+  it('prunes orphaned branch profiles', () => {
+    const omniDir = scaffoldOmniDir(tmpDir);
+    const gitDir = path.join(tmpDir, '.git', 'refs', 'heads');
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'main'), 'abc123\n');
+
+    // Create an existing branch folder and an orphaned branch folder
+    const branchesDir = path.join(omniDir, BRANCHES_DIR);
+    fs.mkdirSync(path.join(branchesDir, 'main'), { recursive: true });
+    fs.mkdirSync(path.join(branchesDir, 'deleted-feature'), { recursive: true });
+
+    const pruned = pruneOrphanedBranches(tmpDir);
+    expect(pruned).toContain('deleted-feature');
+    expect(fs.existsSync(path.join(branchesDir, 'deleted-feature'))).toBe(false);
+    expect(fs.existsSync(path.join(branchesDir, 'main'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Codebase Map
+// ---------------------------------------------------------------------------
+
+describe('Codebase Map', () => {
+  it('generates and formats codebase map', () => {
+    scaffoldOmniDir(tmpDir);
+    fs.writeFileSync(path.join(tmpDir, 'index.ts'), '/** Main entry */\nexport function run() {}\n');
+
+    const map = generateCodebaseMap(tmpDir);
+    expect(map.totalFiles).toBeGreaterThan(0);
+
+    const compact = formatCodebaseMapCompact(map);
+    expect(compact).toContain('Codebase Map');
+    expect(compact).toContain('index.ts');
   });
 });

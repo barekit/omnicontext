@@ -25,6 +25,7 @@ import {
   loadSummary,
   detectArchitecture,
   formatArchitectureCompact,
+  listActiveSessions,
 } from '@barekit/omnicontext-core';
 
 export interface ResourceDefinition {
@@ -37,6 +38,19 @@ export interface ResourceDefinition {
 /** All resources exposed by the OmniContext MCP server. */
 export function listResources(): ResourceDefinition[] {
   return [
+    {
+      uri: 'context://boot',
+      name: 'Boot Context (Auto-Attach)',
+      description:
+        'Complete project context for auto-attachment. Same compact content as get_context tool but exposed as a resource.',
+      mimeType: 'text/markdown',
+    },
+    {
+      uri: 'context://sessions',
+      name: 'Active Sessions',
+      description: 'Active agent sessions and multi-chat locks on this project',
+      mimeType: 'application/json',
+    },
     {
       uri: 'context://instructions',
       name: 'Agent Instructions',
@@ -136,6 +150,15 @@ export function readResource(
 ): { uri: string; mimeType: string; text: string } {
 
   switch (uri) {
+    case 'context://sessions': {
+      const activeSessions = listActiveSessions(omniDir);
+      return {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify(activeSessions),
+      };
+    }
+
     case 'context://instructions': {
       return {
         uri,

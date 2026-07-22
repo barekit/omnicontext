@@ -26,8 +26,18 @@ import {
   GitWatcher,
   ProfileManager,
   getOrBuildIndex,
+  pruneOrphanedBranches,
+  maybeCompactLog,
+  maybeCompactHistory,
+  registerSession,
+  removeSession,
+  generateCodebaseMap,
+  saveCachedMap,
+  loadCachedMap,
+  getCurrentBranch,
   type BranchChangeEvent,
 } from '@barekit/omnicontext-core';
+import { randomUUID } from 'node:crypto';
 import { listResources, readResource } from './resources.js';
 import { listTools, executeTool } from './tools.js';
 
@@ -45,7 +55,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const projectRoot = process.cwd();
 
   const server = new Server(
-    { name: 'omnicontext-mcp', version: '0.1.8' },
+    { name: 'omnicontext-mcp', version: '0.2.0' },
     { capabilities: { resources: {}, tools: {} } },
   );
 
@@ -136,8 +146,42 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     }
   }
 
+  // ---- Server Session & Auto-Maintenance ----
+  const root = resolveOmniRoot(projectRoot);
+  const serverSessionId = randomUUID();
+  let omniDir = '';
+
+  if (root) {
+    omniDir = path.join(root, OMNICODE_DIR);
+
+    // Auto-prune orphaned branches and compact logs in background
+    try {
+      pruneOrphanedBranches(root);
+      maybeCompactLog(omniDir);
+      maybeCompactHistory(omniDir);
+    } catch {}
+
+    // Register process session lock
+    try {
+      const branch = getCurrentBranch(root);
+      registerSession(omniDir, {
+        id: serverSessionId,
+        agentId: 'mcp-server',
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        branch: branch ?? undefined,
+      });
+    } catch {}
+  }
+
   // ---- Graceful shutdown ----
   const cleanup = async () => {
+    if (omniDir) {
+      try {
+        removeSession(omniDir, serverSessionId);
+      } catch {}
+    }
     if (gitWatcher) {
       await gitWatcher.stop();
     }
@@ -147,14 +191,21 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  // ---- Background Indexing ----
-  // Kick off an async index build/load to warm the cache.
-  // ONLY run indexing if we are inside a valid initialized OmniContext workspace
-  const root = resolveOmniRoot(projectRoot);
+  // ---- Background Indexing & Codebase Map Warming ----
   if (root) {
     getOrBuildIndex(root).catch((err) => {
       process.stderr.write(`[omnicontext] Background index error: ${err.message}\n`);
     });
+
+    // Warm codebase map cache asynchronously
+    setTimeout(() => {
+      try {
+        if (!loadCachedMap(omniDir)) {
+          const map = generateCodebaseMap(root);
+          saveCachedMap(omniDir, map);
+        }
+      } catch {}
+    }, 100);
   } else {
     process.stderr.write(
       `[omnicontext] Codebase indexing skipped: OmniContext not initialized in ${projectRoot}\n`,
