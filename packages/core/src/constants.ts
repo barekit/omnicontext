@@ -11,6 +11,9 @@ export const OMNICODE_DIR = '.omnicode';
 /** Primary state file – tracks the active task, blockers, and metadata. */
 export const TASK_FILE = 'task.json';
 
+/** Project-level configuration file. */
+export const CONFIG_FILE = 'config.json';
+
 /** Markdown file containing global project rules for AI agents. */
 export const RULES_FILE = 'rules.md';
 

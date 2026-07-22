@@ -45,6 +45,11 @@ import {
   loadSummary,
   detectArchitecture,
   formatArchitectureCompact,
+  // Config & Auto Summary
+  getEffectiveConfig,
+  getHeadCommitSha,
+  getGitDiffSummary,
+  generateAutoSummary,
   // Session Registry
   registerSession,
   listActiveSessions,
@@ -121,10 +126,11 @@ function archiveCurrentTask(
  * Replaces reading 4-7 separate resources.
  */
 async function buildCompactContext(omniDir: string, projectRoot: string): Promise<string> {
+  const config = getEffectiveConfig(omniDir);
   const context = loadContext(omniDir);
   const branch = getCurrentBranch(projectRoot);
   const rules = loadRules(omniDir);
-  const recentLog = readLogEntries(omniDir, 5);
+  const recentLog = readLogEntries(omniDir, config.contextLogLimit);
   const history = readHistory(omniDir);
   const summary = loadSummary(omniDir);
   const arch = detectArchitecture(projectRoot);
@@ -182,7 +188,7 @@ async function buildCompactContext(omniDir: string, projectRoot: string): Promis
   const rulesLines = rules
     .split('\n')
     .filter(l => l.startsWith('-') || l.startsWith('*'))
-    .slice(0, 10); // max 10 rules
+    .slice(0, config.contextRulesLimit);
   if (rulesLines.length > 0) {
     lines.push('');
     lines.push('## Rules');
@@ -198,7 +204,7 @@ async function buildCompactContext(omniDir: string, projectRoot: string): Promis
     lines.push(...summaryLines);
   }
 
-  // Recent activity (last 5, one-line each)
+  // Recent activity (configurable limit)
   if (recentLog.length > 0) {
     lines.push('');
     lines.push('## Recent Activity');
@@ -599,6 +605,7 @@ export async function executeTool(
     case 'set_task': {
       const title = String(args.title);
       const now = new Date().toISOString();
+      const gitRef = getHeadCommitSha(projectRoot);
 
       // Archive the current task before replacing
       archiveCurrentTask(omniDir, 'replaced', projectRoot);
@@ -610,6 +617,8 @@ export async function executeTool(
         status: 'active',
         blockers: [],
         updatedAt: now,
+        startedAt: now,
+        gitRef: gitRef ?? undefined,
       };
       saveContext(omniDir, context);
 
@@ -653,6 +662,7 @@ export async function executeTool(
       const context = loadContext(omniDir);
 
       const status = String(args.status) as TaskStatus;
+      const completedTask = { ...context.activeTask! };
       context.activeTask!.status = status;
       context.activeTask!.updatedAt = new Date().toISOString();
       saveContext(omniDir, context);
@@ -664,8 +674,27 @@ export async function executeTool(
         branch: branch ?? undefined,
       });
 
-      // Auto-archive completed tasks
+      // Auto-archive completed tasks and auto-generate summary
       if (status === 'completed') {
+        const config = getEffectiveConfig(omniDir);
+        if (config.autoSummary) {
+          try {
+            const allLogs = readLogEntries(omniDir);
+            const taskLogs = completedTask.startedAt
+              ? allLogs.filter((l) => l.timestamp >= completedTask.startedAt!)
+              : allLogs.slice(-10);
+            const diffSummary = getGitDiffSummary(projectRoot, completedTask.gitRef);
+
+            const autoSummary = generateAutoSummary({
+              task: completedTask,
+              logEntries: taskLogs,
+              gitDiffSummary: diffSummary,
+              branch: branch ?? null,
+            });
+            saveSummary(omniDir, autoSummary);
+          } catch {}
+        }
+
         archiveCurrentTask(omniDir, 'completed', projectRoot);
         context.activeTask = undefined;
         saveContext(omniDir, context);

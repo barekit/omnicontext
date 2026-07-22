@@ -16,6 +16,7 @@ import {
   SessionSchema,
   validateState,
 } from './schemas.js';
+import { getEffectiveConfig, saveConfig } from './config.js';
 import {
   OMNICODE_DIR,
   TASK_FILE,
@@ -237,13 +238,14 @@ export function maybeCompactHistory(omniDir: string): boolean {
     .split('\n')
     .filter((l: string) => l.trim().length > 0);
 
-  if (lines.length <= HISTORY_COMPACTION_THRESHOLD) {
+  const config = getEffectiveConfig(omniDir);
+  if (lines.length <= config.historyCompactionThreshold) {
     return false;
   }
 
   const archivePath = path.join(omniDir, HISTORY_ARCHIVE_FILE);
-  const toArchive = lines.slice(0, lines.length - HISTORY_COMPACTION_KEEP);
-  const toKeep = lines.slice(-HISTORY_COMPACTION_KEEP);
+  const toArchive = lines.slice(0, lines.length - config.historyCompactionKeep);
+  const toKeep = lines.slice(-config.historyCompactionKeep);
 
   fs.appendFileSync(archivePath, toArchive.join('\n') + '\n');
   fs.writeFileSync(filePath, toKeep.join('\n') + '\n');
@@ -302,6 +304,9 @@ export function scaffoldOmniDir(projectRoot: string): string {
 
   // Create empty history file
   fs.writeFileSync(path.join(omniDir, HISTORY_FILE), '');
+
+  // Create default config.json
+  saveConfig(omniDir, { autoSummary: true });
 
   // Scaffold agent rules files (.cursorrules, .clinerules, .agents/AGENTS.md)
   ensureAgentRules(projectRoot);

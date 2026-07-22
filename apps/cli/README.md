@@ -47,6 +47,7 @@ npx @barekit/omnicontext setup
 | `omni clean` | Storage maintenance, log compaction, branch pruning |
 | `omni clean --dry-run` | Inspect disk usage and health report |
 | `omni map` | Generate/display codebase tree map & symbol index |
+| `omni config` | View/set project configuration (`config.json`) |
 | `omni status` | Dashboard summary |
 | `omni mcp start` | Start MCP server |
 | `omni mcp start --watch` | Start with git branch watching |

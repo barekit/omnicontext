@@ -108,6 +108,12 @@ export {
   type ProjectArchitecture,
 } from './architecture.js';
 
+// ---- Configuration ----
+export * from './config.js';
+
+// ---- Auto Summary ----
+export * from './auto-summary.js';
+
 // ---- Codebase Map ----
 export * from './codebase-map.js';
 

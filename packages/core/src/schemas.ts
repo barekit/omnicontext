@@ -45,6 +45,10 @@ export const TaskSchema = z.object({
   blockers: z.array(BlockerSchema),
   /** ISO-8601 timestamp of the last update. */
   updatedAt: z.string().datetime(),
+  /** ISO-8601 timestamp of when the task was created. */
+  startedAt: z.string().datetime().optional(),
+  /** Git commit SHA at task creation time for diff calculation. */
+  gitRef: z.string().optional(),
 });
 
 export type Task = z.infer<typeof TaskSchema>;

@@ -9,7 +9,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { MAP_FILE, MAP_MAX_AGE_HOURS } from './constants.js';
+import { MAP_FILE, OMNICODE_DIR } from './constants.js';
+import { resolveOmniRoot } from './io.js';
+import { getEffectiveConfig } from './config.js';
 
 export interface FileMapEntry {
   /** Relative path from project root. */
@@ -38,7 +40,7 @@ export interface CodebaseMap {
 }
 
 /** Directory patterns to ignore during codebase mapping. */
-const IGNORED_DIRS = new Set([
+const BUILTIN_IGNORED_DIRS = new Set([
   'node_modules',
   '.git',
   '.omnicode',
@@ -76,10 +78,16 @@ const EXT_LANG_MAP: Record<string, string> = {
 
 /**
  * Generate a codebase map by scanning the project directory.
- * Scans up to `maxDepth` (default: 4).
+ * Scans up to `maxDepth` (or config override).
  */
-export function generateCodebaseMap(projectRoot: string, maxDepth: number = 4): CodebaseMap {
+export function generateCodebaseMap(projectRoot: string, maxDepthOverride?: number): CodebaseMap {
   const entries: FileMapEntry[] = [];
+  const root = resolveOmniRoot(projectRoot) || projectRoot;
+  const omniDir = path.join(root, OMNICODE_DIR);
+  const config = getEffectiveConfig(fs.existsSync(omniDir) ? omniDir : undefined);
+
+  const maxDepth = maxDepthOverride ?? config.mapMaxDepth;
+  const ignoredDirs = new Set([...BUILTIN_IGNORED_DIRS, ...config.mapIgnore]);
 
   function scan(dir: string, depth: number) {
     if (depth > maxDepth) return;
@@ -96,7 +104,7 @@ export function generateCodebaseMap(projectRoot: string, maxDepth: number = 4): 
         if (item.name === '.git' || item.name === '.omnicode') continue;
       }
 
-      if (IGNORED_DIRS.has(item.name)) continue;
+      if (ignoredDirs.has(item.name)) continue;
 
       const fullPath = path.join(dir, item.name);
       const relPath = path.relative(projectRoot, fullPath);
@@ -216,7 +224,7 @@ export function formatCodebaseMapCompact(map: CodebaseMap): string {
   return lines.join('\n');
 }
 
-/** Load cached map from `.omnicode/map.json`. Returns null if missing or stale (>24h). */
+/** Load cached map from `.omnicode/map.json`. Returns null if missing or stale. */
 export function loadCachedMap(omniDir: string): CodebaseMap | null {
   const mapPath = path.join(omniDir, MAP_FILE);
   if (!fs.existsSync(mapPath)) return null;
@@ -224,8 +232,9 @@ export function loadCachedMap(omniDir: string): CodebaseMap | null {
   try {
     const raw = JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
     const map = raw as CodebaseMap;
+    const config = getEffectiveConfig(omniDir);
     const ageMs = Date.now() - new Date(map.generatedAt).getTime();
-    if (ageMs > MAP_MAX_AGE_HOURS * 60 * 60 * 1000) {
+    if (ageMs > config.mapMaxAgeHours * 60 * 60 * 1000) {
       return null; // Stale
     }
     return map;

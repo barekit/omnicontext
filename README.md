@@ -124,6 +124,9 @@ After setup, **agents manage everything automatically**. You never need to set t
 | `omni clean` | Run storage maintenance, compact logs, prune orphaned branches |
 | `omni clean --dry-run` | Inspect disk usage and health report |
 | `omni map` | Generate and display codebase tree map & symbol index |
+| `omni config` | View current project configuration (`.omnicode/config.json`) |
+| `omni config set <key> <val>` | Set a config property (e.g. `omni config set autoSummary false`) |
+| `omni config reset` | Reset configuration to defaults |
 | `omni status` | Dashboard summary of current state |
 | `omni mcp start` | Start the MCP server |
 | `omni mcp start --watch` | Start with git branch watching |

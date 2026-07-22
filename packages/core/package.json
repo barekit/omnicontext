@@ -1,6 +1,6 @@
 {
   "name": "@barekit/omnicontext-core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Shared schemas, utilities, and git watcher for OmniContext",
   "type": "module",
   "license": "MIT",
