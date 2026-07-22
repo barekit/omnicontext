@@ -178,12 +178,13 @@ When running multiple AI chat threads in the same project:
 ```
 .omnicode/
 ├── task.json          # Active task, status, and blockers
+├── config.json        # Project-level settings & threshold overrides
 ├── rules.md           # Global rules for AI agents
 ├── log.jsonl          # Append-only activity log (auto-compacted at 200 entries)
 ├── log.archive.jsonl  # Archived log entries
 ├── history.jsonl      # Completed/replaced task history
 ├── history.archive.jsonl # Archived task history
-├── summary.md         # Handoff summary from last agent session
+├── summary.md         # Auto-generated handoff summary from completed tasks
 ├── map.json           # Cached codebase file map & symbol index
 ├── sessions/          # Active multi-chat agent session locks
 └── branches/          # Per-branch context snapshots
